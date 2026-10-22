@@ -56,6 +56,8 @@ let
             url = cfg.buildStore.url;
             oidc_audience = cfg.buildStore.oidcAudience;
             credential_env = cfg.buildStore.credentialEnv;
+            systems = cfg.buildStore.systems;
+            eval_in_store = cfg.buildStore.evalInStore;
           };
       build_stores = lib.mapAttrsToList (repos: store: {
         inherit (store) url;
@@ -318,9 +320,9 @@ in
         example = "grpc://nix-store.example.com:50051?system=x86_64-linux";
         description = ''
           Build in this remote store (`nix build --store`) instead of the
-          local one, including import-from-derivation builds during
-          evaluation. Outputs stay there, so this cannot be combined with
-          {option}`uploaders`.
+          local one; see {option}`systems` and {option}`evalInStore` for
+          what goes there. Outputs stay there, so this cannot be combined
+          with {option}`uploaders`.
         '';
       };
 
@@ -386,6 +388,31 @@ in
             };
           }
         );
+      };
+
+      systems = lib.mkOption {
+        type = lib.types.nullOr (lib.types.listOf lib.types.str);
+        default = null;
+        example = [
+          "x86_64-linux"
+          "i686-linux"
+        ];
+        description = ''
+          Systems whose attributes build in the store; `null` means all.
+          Attributes of other systems build in the local store, whose
+          build hook can still dispatch them to remote builders.
+        '';
+      };
+
+      evalInStore = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Also run import-from-derivation builds during evaluation in the
+          store. This puts the store token into the evaluator sandbox,
+          where the evaluated repository's code can read and leak it.
+          Off, IFD builds in the local store.
+        '';
       };
     };
 

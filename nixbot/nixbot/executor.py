@@ -372,13 +372,25 @@ def build_installables(job: NixEvalJobSuccess) -> list[str]:
     return [f"{job.drv_path}^*"]
 
 
+def job_store(
+    job: NixEvalJobSuccess,
+    settings: BuildSettings,
+    store: BuildStoreConfig | None = None,
+) -> BuildStoreConfig | None:
+    """The store for one build: the per-repository one if the caller
+    resolved it, else the instance-wide one, and only if it serves this
+    job's system."""
+    store = store if store is not None else settings.store
+    return store if store is not None and store.builds(job.system) else None
+
+
 def build_nix_command(
     job: NixEvalJobSuccess,
     settings: BuildSettings,
     out_link: Path,
     store: BuildStoreConfig | None = None,
 ) -> list[str]:
-    store = store if store is not None else settings.store
+    store = job_store(job, settings, store)
     return [
         "nix",
         "build",
@@ -905,6 +917,7 @@ class NixBuildExecutor:
         if cancel_event.is_set():
             return BuildOutcome.cancelled, False
         out_link = cwd / f"result-{safe_attr_filename(job.attr)}"
+        store = job_store(job, self.settings, store)
         cmd = build_nix_command(job, self.settings, out_link, store)
         async with self._store_env(identity, store) as env:
             return await self._run_nix(
