@@ -226,6 +226,15 @@ class BuildStoreConfig(BaseModel):
     oidc_audience: str | None = None
     # Environment variable that carries the token file path to nix.
     credential_env: str = "NIX_GRPC_TOKEN_FILE"
+    # Systems whose attributes build in the store; None means all. The
+    # others build in the local store, whose build hook may dispatch them.
+    systems: list[str] | None = None
+    # Also run IFD builds in the store. The token then sits in the
+    # evaluator sandbox, where the repository's code can read it.
+    eval_in_store: bool = False
+
+    def builds(self, system: str) -> bool:
+        return self.systems is None or system in self.systems
 
 
 class PrApprovalConfig(BaseModel):

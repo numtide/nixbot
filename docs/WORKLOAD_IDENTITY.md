@@ -122,9 +122,14 @@ with the old key.
 example against a nix-grpc-store farm. Outputs stay in that store, so it cannot
 be combined with `uploaders`.
 
-The evaluation uses it too: `nix-eval-jobs` runs with `NIX_REMOTE=<url>` and
-`--eval-store daemon`, so import-from-derivation builds run in the store while
-the evaluated derivations stay in the local daemon.
+`buildStore.systems` limits this to attributes of the listed systems; the others
+build locally, where nix's build hook can still hand them to remote builders.
+
+Import-from-derivation builds stay in the local store unless
+`buildStore.evalInStore` is set. Then `nix-eval-jobs` runs with
+`NIX_REMOTE=<url>` and `--eval-store daemon`, and the store token is visible in
+the evaluator sandbox: the evaluated code can read it, so only enable this when
+every evaluated repository is trusted with the store's write access.
 
 With `buildStore.oidcAudience` set, nixbot writes an ID token for that audience
 to a private file per build, refreshes it every two thirds of `tokenTtl`, and

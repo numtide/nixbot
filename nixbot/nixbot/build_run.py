@@ -386,7 +386,7 @@ async def _with_build_store(
 ) -> EvalSettings:
     """Send IFD builds to the build store, authenticated like attribute builds."""
     store = o.config.build_store
-    if store is None:
+    if store is None or not store.eval_in_store:
         return settings
     settings = dataclasses.replace(
         settings,
