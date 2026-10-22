@@ -372,9 +372,17 @@ def build_installables(job: NixEvalJobSuccess) -> list[str]:
     return [f"{job.drv_path}^*"]
 
 
+def job_store(
+    job: NixEvalJobSuccess, settings: BuildSettings
+) -> BuildStoreConfig | None:
+    store = settings.store
+    return store if store is not None and store.builds(job.system) else None
+
+
 def build_nix_command(
     job: NixEvalJobSuccess, settings: BuildSettings, out_link: Path
 ) -> list[str]:
+    store = job_store(job, settings)
     return [
         "nix",
         "build",
@@ -399,8 +407,8 @@ def build_nix_command(
         "--accept-flake-config",
         *settings.extra_args,
         *(
-            ["--store", settings.store.url, "--eval-store", "auto"]
-            if settings.store
+            ["--store", store.url, "--eval-store", "auto"]
+            if store
             else ["--out-link", str(out_link)]
         ),
         *build_installables(job),
@@ -873,10 +881,10 @@ class NixBuildExecutor:
 
     @contextlib.asynccontextmanager
     async def _store_env(
-        self, identity: EffectIdentity | None
+        self, store: BuildStoreConfig | None, identity: EffectIdentity | None
     ) -> AsyncIterator[dict[str, str] | None]:
         """Environment pointing nix at a token file that is kept fresh."""
-        store, issuer = self.settings.store, self.settings.issuer
+        issuer = self.settings.issuer
         if store is None or store.oidc_audience is None:
             yield None
             return
@@ -899,7 +907,7 @@ class NixBuildExecutor:
             return BuildOutcome.cancelled, False
         out_link = cwd / f"result-{safe_attr_filename(job.attr)}"
         cmd = build_nix_command(job, self.settings, out_link)
-        async with self._store_env(identity) as env:
+        async with self._store_env(job_store(job, self.settings), identity) as env:
             return await self._run_nix(
                 cmd, env, job, log_writer, cwd, cancel_event, on_built
             )
