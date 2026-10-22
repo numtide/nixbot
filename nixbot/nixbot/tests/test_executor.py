@@ -288,6 +288,24 @@ def test_store_for_picks_per_repo_then_default() -> None:
     assert other.url == "grpc://farm:50051"
 
 
+def test_build_nix_command_store_only_for_its_systems(tmp_path: Path) -> None:
+    settings = BuildSettings(
+        log_dir=tmp_path,
+        store=BuildStoreConfig(
+            url="grpc://farm.example.com:50051?system=x86_64-linux",
+            systems=["x86_64-linux"],
+        ),
+    )
+    x86 = build_nix_command(mk_job(), settings, tmp_path / "result-foo")
+    assert "--store" in x86
+    # The local daemon's build hook dispatches other systems.
+    darwin = build_nix_command(
+        mk_job(system="aarch64-darwin"), settings, tmp_path / "result-foo"
+    )
+    assert "--store" not in darwin
+    assert darwin[darwin.index("--out-link") + 1] == str(tmp_path / "result-foo")
+
+
 def test_uploaders_conflict_with_build_store() -> None:
     with pytest.raises(ValueError, match="cannot be combined"):
         Config.model_validate(
