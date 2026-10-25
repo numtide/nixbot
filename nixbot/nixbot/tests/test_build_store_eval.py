@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 
 async def eval_settings(tmp_path: Path, store: BuildStoreConfig) -> EvalSettings:
     o: Any = SimpleNamespace(
-        config=SimpleNamespace(build_store=store),
+        config=SimpleNamespace(store_for=lambda *, external: store),  # noqa: ARG005
         identity_issuer=make_issuer(tmp_path),
     )
-    build: Any = SimpleNamespace(id_=1)
+    build: Any = SimpleNamespace(id_=1, external=False)
     async with contextlib.AsyncExitStack() as stack:
         return await _with_build_store(
             o,

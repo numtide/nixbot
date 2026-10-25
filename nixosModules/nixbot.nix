@@ -58,6 +58,17 @@ let
             systems = cfg.buildStore.systems;
             eval_in_store = cfg.buildStore.evalInStore;
           };
+      external_build_store =
+        if cfg.externalBuildStore.url == null then
+          null
+        else
+          {
+            url = cfg.externalBuildStore.url;
+            oidc_audience = cfg.externalBuildStore.oidcAudience;
+            credential_env = cfg.externalBuildStore.credentialEnv;
+            systems = cfg.externalBuildStore.systems;
+            eval_in_store = cfg.externalBuildStore.evalInStore;
+          };
       gitea =
         if !cfg.gitea.enable then
           null
@@ -351,6 +362,47 @@ in
           where the evaluated repository's code can read and leak it.
           Off, IFD builds in the local store.
         '';
+      };
+    };
+
+    externalBuildStore = {
+      url = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "grpc://public-builders.example.com:50051?system=x86_64-linux";
+        description = ''
+          Build pull requests from outside contributors in this store
+          instead of {option}`buildStore`, so that their code never runs on
+          the builders that internal builds share. Which pull requests
+          those are: {option}`prApproval.trustedAssociations`. Needs
+          {option}`buildStore.url`. When unset, both kinds build in
+          {option}`buildStore` and differ only in the `trust` claim of
+          their token.
+        '';
+      };
+
+      oidcAudience = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "As {option}`buildStore.oidcAudience`, for this store.";
+      };
+
+      credentialEnv = lib.mkOption {
+        type = lib.types.str;
+        default = "NIX_GRPC_TOKEN_FILE";
+        description = "Environment variable that carries the token file path to nix.";
+      };
+
+      systems = lib.mkOption {
+        type = lib.types.nullOr (lib.types.listOf lib.types.str);
+        default = null;
+        description = "As {option}`buildStore.systems`, for this store.";
+      };
+
+      evalInStore = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "As {option}`buildStore.evalInStore`, for this store.";
       };
     };
 

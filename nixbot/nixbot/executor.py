@@ -360,7 +360,13 @@ class BuildSettings:
     # Extra `nix build` arguments, e.g. --option overrides.
     extra_args: list[str] = field(default_factory=list)
     store: BuildStoreConfig | None = None
+    external_store: BuildStoreConfig | None = None
     issuer: IdentityIssuer | None = None
+
+    def store_for(self, identity: EffectIdentity | None) -> BuildStoreConfig | None:
+        if identity is not None and identity.trust == "external":
+            return self.external_store or self.store
+        return self.store
 
 
 def build_installables(job: NixEvalJobSuccess) -> list[str]:
@@ -373,16 +379,20 @@ def build_installables(job: NixEvalJobSuccess) -> list[str]:
 
 
 def job_store(
-    job: NixEvalJobSuccess, settings: BuildSettings
+    job: NixEvalJobSuccess,
+    settings: BuildSettings,
+    identity: EffectIdentity | None = None,
 ) -> BuildStoreConfig | None:
-    store = settings.store
+    store = settings.store_for(identity)
     return store if store is not None and store.builds(job.system) else None
 
 
 def build_nix_command(
-    job: NixEvalJobSuccess, settings: BuildSettings, out_link: Path
+    job: NixEvalJobSuccess,
+    settings: BuildSettings,
+    out_link: Path,
+    store: BuildStoreConfig | None = None,
 ) -> list[str]:
-    store = job_store(job, settings)
     return [
         "nix",
         "build",
@@ -906,8 +916,9 @@ class NixBuildExecutor:
         if cancel_event.is_set():
             return BuildOutcome.cancelled, False
         out_link = cwd / f"result-{safe_attr_filename(job.attr)}"
-        cmd = build_nix_command(job, self.settings, out_link)
-        async with self._store_env(job_store(job, self.settings), identity) as env:
+        store = job_store(job, self.settings, identity)
+        cmd = build_nix_command(job, self.settings, out_link, store)
+        async with self._store_env(store, identity) as env:
             return await self._run_nix(
                 cmd, env, job, log_writer, cwd, cancel_event, on_built
             )
